@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html>
+
+<!--- TODO
+
+* finish documentation
+* L1 arrested
+* define custom periods placed at arbitrary locations
+* periods and theme presets
+* use period as objet with methods for drawing (eg tcoordtohours should be a method)
+* option to personalize theme
+
+         Possibility to save as png, and choose resolution in the process
+·         Name of saved image should be the name of the experiment and not just “tl.svg” (first remove special characters)
+·         On Safari, it’s possible to set time as 21 (instead of 21:00), leading to bug in display: check that time consistent, correct it if needed
+·         Possibility to add annotation (with a vertical offset), e.g. to overwrite the actual time of imaging
+·         Non-color themes
+·         Help page
+
+
+-->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Self-contained application for drawing a timeline of C. elegans development">
+    <meta name="author" content="A Weinreb">
+    
+    
+    <style>
+        .box{
+            background-color: AliceBlue;
+            border-style: solid;
+            border-width: medium;
+            border-color: MediumPurple;
+            float: left;
+            margin: 1%;
+        }
+        .miniBox{
+            background-color: LightGray;
+            border-style: solid;
+            border-width: thin;
+            border-color: MediumPurple;
+            padding: 3px;
+            margin: 3px;
+            float: left;
+            clear: left;
+        }
+        .durationField{
+            width: 50px;
+        }
+    </style>
+
+</head>
+
+
+<body onload="computeDRF()">
+
+<script>
+// This is the full help text
+helpText=`<h1> Documentation</h1>
+<p>Reload page to come back to timeline computations.</p>
+<h2>Principle</h2>
+<p>This script has a built-in description of worm development, with stage names and durations. It will draw a timeline predicting what stage the worms have at a given time.</p>
+
+<h3>Input</h3>
+<p>This script knows two methods to synchronize worms: using an egg-lay or with L1 arrest. For an egg-lay, gravid adults are placed on plates and allowed to lay eggs for a defined period of time (typically 1h), then removed. That way, all the eggs on the plate will have approximately the same age. Another way to synchronize larger populations of worms is to bleach a large population of gravid adults. The bleach will kill all larvae and adults, but the embryo will survive. The eggs are then placed in a liquid medium without food and allowed to hatch. The larval population will become L1 arrested. Once these L1 arrested are plated with food, they will resume their development. Both egg-lay and bleach/L1 arrest have been described elsewhere, and protocols are available e.g. in Wormbook.</p>
+
+<h3>Timings</h3>
+<p>If the checkbox "L1 arrest" is unchecked, the developmental timing is defined based on the description by Byerly, Cassada and Russel (Dev. Biol. 1976), complemented with unpublished experiments.</p>
+
+<p>If the checkbox "L1 arrest" is checked, the developmental timing is the one defined in [...]</p>
+
+<p>You can modify the timings by using the box on the right side to use custom periods. You have to set the period name, starting point (in hours) and duration (in hours), the other periods automatically update. You can also add or remove periods, for instance to your definition of young adult...</p>
+
+<h3>Empirical determination of timings</h3>
+<p>The timings provided may not be correct in your case: worm development may change depending on the genetic background of the line you are using, the temperature conditions in your lab, etc... If you need a precise timing for your experiments, you may determine the period durations or the DRF for your experimental conditions.</p>
+<p>Using quiescence</p>
+
+<h4>Theoretical model</h4>
+
+
+
+`;
+
+
+function displayHelp(){
+	document.write(helpText);
+}
+
+
+</script>
+
+<h1>Worm timeline</h1>
+
+<p>
+<button type="button" onclick="displayHelp()">Display help</button>
+</p>
+
+<form id="inputForm" class="box" 
+        oninput="computeDRF()"
+        style="width: 40%">
+    
+    <div class="miniBox">
+    <label for="title">Title or comment:<br></label>
+    <input type="text" id="title">
+    </div>
+    <br>
+    
+    <div class="miniBox">
+    <label for="arrest">L1 arrest?<br></label>
+     <input type="checkbox" id="arrest" value="eggLay" onchange="checkArrest()"><br>
+    </div>
+    <br>
+
+    
+    <div class="miniBox">
+    <label for="beginning" id="labelBeginning">Beginning of egg-lay:</label>
+    <input type="time" id="beginning">
+    <br>
+    </div>
+    
+    <div class="miniBox" style="clear: none">
+    <div id="formEggLay">
+    <label for="end">End of egg-lay:</label>
+    <input type="time" id="end">
+    </div>
+    </div>
+    <br>
+    
+    <div class="miniBox">
+    <label for="DRF20">Experimental Development Rate Factor:<br></label>
+    <input type="number" id="DRF20" value="1">
+    </div>
+    <br>
+    
+    <div class="miniBox">
+    <label for="temperature">Temperature (°C):<br></label>
+    <input type="range" name="tempRange" min="15" max="25" value="20"
+         oninput="temperature.value=parseFloat(tempRange.value)">
+    <input type="number" name="temperature" min="15" max="25" value="20"
+         style="width: 50px;"
+         oninput="tempRange.value=parseFloat(temperature.value)">
+    <br>
+    </div>
+    
+    <div class="miniBox">
+    <label for="DRF">DRF = </label>
+    <output name="DRF" for="DRF20 temperature"></output>
+    <br>
+    </div>
+    
+    <div class="miniBox" style="clear: none;">
+    <button type="button" onclick="drawTimeline()">Draw</button>
+    </div>
+</form>
+
+
+
+<div class="box" style="width: 30%">
+    <p onclick="document.getElementById('periods').style.display='block'">Click to change periods beginnings and durations at 20°C.</p>
+    <form id="periods" style="display: none;">
+        <!-- periods get added here -->
+        
+        <button type="button" onclick="addPeriod()">Add period</button>
+    </form>
+</div>
+
+
+
+<p id="drawHere"></p>
+
+
+
+
+<script>
+    
+// Define all javascript here
+    
+//global   
+var version = 2.6;
+
+/* ##############################################################################
+############################     Default values     #############################
+############################################################################## */
+
+function Theme() {
+    // Describe the theme as an object
+    this.imLength = 1300;
+    this.strokeWidth = this.imLength / 500;
+    this.imHeight = this.imLength / 5;
+    this.xPositionTimeAxis = this.imLength * 0.05;
+    this.yPositionTimeAxis = this.imHeight * 2/6;
+    this.lenTimeAxis = this.imLength * 0.94;
+    this.heightTimeAxis = 1.5 * this.strokeWidth;
+    this.lenTimeArrow = 0.1 * this.lenTimeAxis;
+    this.grad1Height = 3 * this.strokeWidth;
+    this.grad12Height = 7 * this.strokeWidth;
+    this.grad24Height = 12 * this.strokeWidth;
+    this.fontSize = 3.5 * this.strokeWidth;
+    this.fontSizeDay = 2 * this.fontSize;
+    this.timekeeping = 24;
+    this.yPositionDayAboveAxis = 20 * this.strokeWidth;
+    this.heightPeriod = 2 * this.strokeWidth;
+    this.egglayCol = "red";
+    this.colScheme = ["slateBlue", "blue", "pink", "aqua", "darkOrchid"];
+    this.periodNameSpacing = 0 * this.strokeWidth;
+    this.linesEggLayBeginsEnds = 2;
+    this.linesSpacingEggLayBeginsEnds = 5 * this.strokeWidth;
+}
+
+function Periods_default_egglay() {
+	this.stageName = ["L1", "L2", "L3", "L4"];
+	this.stageDuration = [15, 7, 8, 12];
+	this.stageBeginning = [11, 15, 7, 8];
+	this.totalDuration = getTotalDuration(this.stageDuration); //in hours
+}
+
+function Periods_default_bleach() {
+	this.stageName = ["L1", "L2", "L3", "L4"];
+	this.stageDuration = [11, 7, 8, 12];
+	this.stageBeginning = [0, 11, 7, 8];
+	this.totalDuration = getTotalDuration(this.stageDuration); //in hours
+}
+
+// Use defaults
+var Periods = new Periods_default_egglay();
+var theme = new Theme();
+
+var totalDuration;
+
+/* ##############################################################################
+###################### Javascript for input form management #####################
+#################################################################################
+############################################################################## */
+
+
+function checkArrest(){
+    // Actions to perform upon choosing between egg-lay or arrested
+    //document.getElementById('drawHere').innerHTML = document.getElementById('arrest').checked;
+    if(document.getElementById('arrest').checked == true){
+        document.getElementById('formEggLay').innerHTML = "";
+        document.getElementById('labelBeginning').innerHTML = "On food at:";
+		Periods = new Periods_default_bleach();
+		populatePeriods(Periods);
+    }
+    else{
+        document.getElementById('formEggLay').innerHTML = 'End of egg-lay:<br>\
+<input type="time" id="end">';
+        document.getElementById('labelBeginning').innerHTML = "Beginning of egg-lay:";
+		Periods = new Periods_default_egglay();
+		populatePeriods(Periods);
+    }
+}
+
+var DRF; //keep it as global variable, so no need to retrieve toFixed value later
+function computeDRF(){
+    var iForm = document.getElementById('inputForm');
+    DRF = (parseFloat(iForm.DRF20.value) * (0.07639583564892 *
+         parseFloat(iForm.temperature.value) - 0.5279167129784));
+    iForm.DRF.value = DRF.toFixed(3);
+}
+
+var nPeriods = 0;
+function addPeriod(name, dur, beg){
+    // Add a period
+    var perBox;
+    var newElement;
+
+    //create a box for this period
+    perBox = document.createElement("div");    
+    perBox.id = "perBox"+(nPeriods+1);
+    perBox.className = "miniBox";
+    document.getElementById('periods').appendChild(perBox);
+
+    //the name of the period
+    newElement = document.createElement("label");
+    newElement.innerHTML = 'Period '+(nPeriods+1);
+    newElement.htmlFor = "name"+(nPeriods+1);
+    perBox.appendChild(newElement);
+    
+    newElement = document.createElement("input");    
+    newElement.type="text";
+    newElement.id="name"+(nPeriods+1);
+    newElement.value="period "+(nPeriods+1);
+    if(name) newElement.value = name;
+    perBox.appendChild(newElement);
+    perBox.appendChild(document.createElement('br'));
+
+    //beginning of the period
+    newElement = document.createElement("input");    
+    newElement.type="number";
+    newElement.id="begPeriod"+(nPeriods+1);
+    newElement.min=0;
+    newElement.className = "durationField";
+    newElement.setAttribute("oninput","updatePeriodDuration(this)");
+    if(beg) newElement.value = beg;
+    perBox.appendChild(newElement);    
+    
+    //duration of the period
+    newElement = document.createElement("input");
+    newElement.type="number";
+    newElement.id="durPeriod"+(nPeriods+1);
+    newElement.min=0;
+    newElement.className = "durationField";
+    newElement.setAttribute("oninput","updatePeriodBeginning(this)");
+    if(dur) newElement.value = dur;
+    perBox.appendChild(newElement);     
+
+    //button to delete the period
+    newElement = document.createElement("button");
+    newElement.type="button";    
+    newElement.name="delButton"+(nPeriods+1);
+    newElement.onclick="delPeriod("+(nPeriods+1)+")";
+    newElement.innerHTML = "Delete period";
+    newElement.setAttribute("onclick", "deletePeriod(this)");    
+    perBox.appendChild(newElement);     
+    
+    perBox.appendChild(document.createElement('br'));
+    
+
+    nPeriods += 1;
+}
+
+function updatePeriodDuration(per){
+    // Update previous period duration upon input of beginning
+    var i = parseInt(per.id.substring(9));
+    if(i < 2 ){
+        console.log("can't compute");
+    } else{
+        console.log("updating duration "+i);
+        document.getElementById("durPeriod"+(i-1)).value =
+            Number(document.getElementById("begPeriod"+i).value) - Number(document.getElementById("begPeriod"+(i-1)).value);
+    }
+}
+
+function updatePeriodBeginning(per){
+    // Update next period begin time upon input of duration
+    var i = parseInt(per.id.substring(9));
+    if(i > nPeriods - 1){
+        console.log("can't compute");
+        console.log("i="+i+" ; nPeriods = "+nPeriods);
+    } else{
+        console.log("updating begin "+i);
+        document.getElementById("begPeriod"+ (i+1)).value =
+            Number(document.getElementById("begPeriod"+i).value) + Number(document.getElementById("durPeriod"+i).value);
+    }
+}
+
+function deletePeriod(per){
+    // Delete period
+    var i = per.name.substring(9);
+    if(i<1 | i>nPeriods){
+        console.log("Error for deletion: can't delete period "+i);
+    } else{
+        var child = document.getElementById("perBox"+i);
+        var parent = document.getElementById("periods");
+        parent.removeChild(child);
+		nPeriods -= 1;
+    }
+}
+
+/*
+// from https://www.javascripttutorial.net/dom/manipulating/remove-all-child-nodes/
+function deleteAllPeriods(){
+	parent = document.getElementById("periods");
+	while (parent.firstChild) {
+        parent.removeChild(parent.firstChild);
+    }
+	nPeriods = 0;
+}*/
+
+function deleteAllPeriods(){
+	while (nPeriods > 0) {
+        deletePeriod(document.getElementById("perBox"+nPeriods).childNodes[5]);
+    }
+}
+
+// Populate periods form with default parameters (name and duration)
+function populatePeriods(Periods){
+	// remove all existing
+	deleteAllPeriods();
+	
+	// add new ones
+	for(stage=0; stage < Periods.stageName.length; stage++){
+		addPeriod(Periods.stageName[stage], Periods.stageDuration[stage], Periods.stageBeginning[stage]);
+	}
+
+	// Set beginning times
+	for(stage=0; stage < Periods.stageName.length-1; stage++){
+		updatePeriodBeginning(document.getElementById('durPeriod'+(stage+1)));
+	}
+}
+
+function getTotalDuration(perList){
+	totDur = 0;
+	for(i = 5; i < perList.length; i ++){
+		totDur += parseInt(perList[i].childNodes[4].value);
+	}
+	return(Math.max(4*24, totDur));
+}
+
+/* ##############################################################################
+################## Populate input forms with default parameters ##################
+#################################################################################
+############################################################################## */
+
+// Populate main input form
+var currDt = new Date();
+//use current date as title
+document.getElementById('title').value = currDt.toISOString().slice(0,10);
+//use current time as egg-lay start
+document.getElementById('beginning').value = currDt.toLocaleTimeString().slice(0,5);
+//set egg-lay end 2h later
+currDt.setHours(currDt.getHours() +2);
+document.getElementById('end').value = currDt.toLocaleTimeString().slice(0,5);
+
+populatePeriods(Periods);
+
+
+/* ##############################################################################
+############################ Javascript for drawing #############################
+#################################################################################
+############################################################################## */
+
+// helper functions
+function tCoord(t){
+	// converts time (h) in x coordinate
+	return theme.xPositionTimeAxis + t * theme.lenTimeAxis / totalDuration;
+}
+
+function drawGrad(t, strokeHeight, text){
+	//draw a graduation at time t
+	var xCoord = tCoord(t);
+	var im = '<line x1="'+ xCoord +'" y1="'+ (theme.yPositionTimeAxis - strokeHeight) +
+		'" x2="'+ xCoord +'" y2="'+ theme.yPositionTimeAxis +
+		'" style="stroke:black ;stroke-width:'+ theme.strokeWidth +'" />';
+	
+	var writtenTime; //to define the way we write time
+	switch(theme.timekeeping){
+		case 24:
+			writtenTime = t%24;
+			break;
+		case 12:
+			writtenTime = t%12;
+			break;
+		default:
+			console.log("Error when reading timekeeping");
+	}
+	
+	var xCenter = xCoord - t.toString().length * theme.fontSize /4;
+	im += '<text x="'+ xCenter +'" y="'+ (theme.yPositionTimeAxis - 1.5 * strokeHeight) +
+		'" style="font-size:'+ theme.fontSize +'px">'+ 
+		writtenTime +'</text>';
+
+	return im;
+}
+	
+function drawPeriod(tBeg, tEnd, yPos, periodName, color){
+	// draws a period of time
+	xBeg = tCoord(tBeg);
+	xEnd = tCoord(tEnd);
+	yy = theme.yPositionTimeAxis + theme.heightTimeAxis + yPos;
+	
+	im = '<rect x="'+ xBeg +'" y="'+ yy +
+		'" width="'+ (xEnd - xBeg) +
+		'" height="'+ theme.heightPeriod +
+		'" style="fill:'+ color +';stroke-width:'+ theme.strokeWidth +
+		';stroke:'+ color +'" />'
+	if(periodName != ""){
+		im += '<text x="'+ (xBeg + (xEnd - xBeg) / 2 - theme.fontSizeDay * periodName.length /4) +
+			'" y="'+ (yy + theme.heightPeriod + theme.periodNameSpacing + theme.fontSizeDay) +
+			'" style="font-size:'+ theme.fontSizeDay +'px">'+ periodName +'</text>';
+	}
+	console.log("periodName "+periodName+" tBeg "+tBeg+ " tEnd "+tEnd+"; color: "+color);
+	return im;
+}
+
+function download(filename, text) {
+	// listener for download button
+	var element = document.createElement('a');
+	element.setAttribute('href', 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text));
+	element.setAttribute('download', filename);
+
+	element.style.display = 'none';
+	document.body.appendChild(element);
+
+	element.click();
+
+	document.body.removeChild(element);
+}
+
+
+// main drawing
+function drawTimeline(){
+    // The function that is actually called to make the drawing
+    
+    
+    
+    //Reading the input form
+    iForm = document.getElementById("inputForm");
+    title = iForm.title.value;
+    isEggLay = !iForm.arrest.checked;
+	
+	if(isEggLay){
+		eggLayBegins = parseInt(iForm.beginning.value.split(":")[0]) + iForm.beginning.value.split(":")[1] /60;
+		eggLayEnds = parseInt(iForm.end.value.split(":")[0]) + iForm.end.value.split(":")[1] /60;
+		if(eggLayBegins > eggLayEnds) eggLayBegins -= 24; //for the edge case when egg-lay around midnight
+	}
+    temp = iForm.temperature.value;
+  
+    // read the period form
+	var perName, perDuration,
+        perList = document.getElementById('periods').childNodes;
+	
+	totalDuration = getTotalDuration(perList);
+    
+    // ----------------------- Create drawing ------------------------------------
+    
+    // initialize
+    image = '<svg width="'+ theme.imLength +'" height="'+ theme.imHeight +'">';
+    // Main axis
+    image += '<rect x="'+ theme.xPositionTimeAxis +'" y="'+ theme.yPositionTimeAxis +
+            '" width="'+ (theme.lenTimeAxis + theme.lenTimeArrow) +
+            '" height="'+ theme.heightTimeAxis +
+            '" style="fill:black;stroke-width:'+ theme.strokeWidth +';stroke:black" />'
+
+    
+    
+    for(t=1; t < totalDuration; t++){
+        if(t%24==0) image += drawGrad(t, theme.grad24Height);
+        else if(t%12==0) image += drawGrad(t, theme.grad12Height);
+        else image += drawGrad(t, theme.grad1Height);
+    }
+    
+    // Write days
+    var xx, yy, dayText;
+    for(day = 1; day < totalDuration/24+1; day++){
+	    dayText = 'Day ' + day;
+	    xx = theme.xPositionTimeAxis + (day - 0.5)*24* theme.lenTimeAxis/totalDuration -
+	    theme.fontSizeDay * dayText.length / 4;
+	    yy = theme.yPositionTimeAxis - theme.yPositionDayAboveAxis;
+
+	    image += '<text x="'+xx+'" y="'+yy+
+	    '" style="font-size:'+ theme.fontSizeDay +'px">'+ dayText +'</text>';
+	    
+    }
+    yy=undefined; //will reuse
+
+
+
+    /* ##############################################################################
+    ################################ Adding stages ################################
+    #################################################################################
+    ############################################################################## */
+
+    var xBeg, xEnd;
+    
+    
+    
+    
+
+
+    // draw egg lay period
+    if(isEggLay) image += drawPeriod(eggLayBegins, eggLayEnds, 10, "Egg lay", theme.colScheme[0]);
+    
+    // Draw other periods
+    
+
+
+    for(i=5; i<perList.length; i++){
+        perName = perList[i].childNodes[1].value;
+        perBeg = perList[i].childNodes[3].value / DRF;
+        perDuration = perList[i].childNodes[4].value / DRF;
+
+        if(theme.linesEggLayBeginsEnds == 2){
+            image += drawPeriod(eggLayBegins + perBeg, eggLayBegins + perBeg + perDuration,
+                 10, '', theme.colScheme[i-5]);
+            image += drawPeriod(eggLayEnds + perBeg, eggLayEnds + perBeg + perDuration,
+                 10 + theme.linesSpacingEggLayBeginsEnds,
+                  perName, theme.colScheme[i-5]);
+        }
+    }
+    
+    
+	/* ##############################################################################
+	################################### Last steps ##################################
+	#################################################################################
+	############################################################################## */
+    
+    // Add descriptive text
+    image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px">'+ title +'</text>';
+
+    image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay began: '+
+	             Math.trunc(eggLayBegins) + "h"+ Math.round(60*(eggLayBegins%1)) +'</text>';
+
+	image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 3*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay ended: '+
+	            Math.trunc(eggLayEnds) + "h"+ Math.round(60*(eggLayEnds %1)) +'</text>';
+
+    image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 4*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> DRF @ 20°C: '+
+	             Math.round(100*iForm.DRF20.value)/100 +'</text>';
+
+    image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 5*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> T: '+
+	             iForm.temperature.value +'°C</text>';
+
+    image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 6*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> DRF: '+
+	             Math.round(1000*DRF)/1000 +'</text>';
+
+    var Dt = new Date();
+    message = 'Generated by worm_timeline v.'+version+' on '+Dt.toLocaleString() ;
+    image += '<text x="' + (theme.imLength - message.length*0.8*theme.fontSize) +
+             '" y="'+ (theme.imHeight - 1.5*theme.fontSize) +
+	            '" style="font-size:'+ theme.fontSize +'px; fill:LightGray;">'+message+'</text>';
+
+    // Generate image
+    image += '</svg>';
+    document.getElementById('drawHere').innerHTML = image;
+    
+    
+    // Make download button
+    var dwdButton = document.createElement("button");
+    dwdButton.type = "button";
+    dwdButton.innerHTML = "Download SVG";
+    dwdButton.id = "dwdButton";
+    document.getElementById("drawHere").appendChild(dwdButton);
+    
+    
+
+    // Start file download.
+    document.getElementById("dwdButton").addEventListener("click", function(){
+        // Generate download of hello.txt file with some content
+        var text = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">'+image;
+        var filename = "tl.svg";
+        download(filename, text);
+    },
+    false);
+
+}
+
+</script>
+
+
+</body>
+</html>
+
