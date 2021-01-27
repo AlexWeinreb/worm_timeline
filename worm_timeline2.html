@@ -188,9 +188,9 @@ function Theme() {
     this.imLength = 1300;
     this.strokeWidth = this.imLength / 500;
     this.imHeight = this.imLength / 5;
-    this.xPositionTimeAxis = this.imLength * 0.05;
+    this.xPositionTimeAxis = this.imLength * 0.08;
     this.yPositionTimeAxis = this.imHeight * 2/6;
-    this.lenTimeAxis = this.imLength * 0.94;
+    this.lenTimeAxis = this.imLength * 0.92;
     this.heightTimeAxis = 1.5 * this.strokeWidth;
     this.lenTimeArrow = 0.1 * this.lenTimeAxis;
     this.grad1Height = 3 * this.strokeWidth;
@@ -580,17 +580,26 @@ function drawTimeline(){
 	#################################################################################
 	############################################################################## */
     
-    // Add descriptive text
+    // Add descriptive text on the left
     image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + theme.fontSizeDay) +
 	            '" style="font-size:'+ theme.fontSize +'px">'+ title +'</text>';
 
-    image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
+    if(isEggLay){
+      image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
 	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay began: '+
 	             Math.trunc(starts[0]) + "h"+ Math.round(60*(starts[0]%1)) +'</text>';
 
-	image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 3*theme.fontSizeDay) +
-	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay ended: '+
-	            Math.trunc(starts[1]) + "h"+ Math.round(60*(starts[1] %1)) +'</text>';
+      image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 3*theme.fontSizeDay) +
+  	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay ended: '+
+  	            Math.trunc(starts[1]) + "h"+ Math.round(60*(starts[1] %1)) +'</text>';
+    } else{
+      image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> L1 arrest</text>';
+      image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 3*theme.fontSizeDay) +
+	            '" style="font-size:'+ theme.fontSize +'px"> On food at: '+
+	             Math.trunc(starts[0]) + "h"+ Math.round(60*(starts[0]%1)) +'</text>';
+    }
+    
 
     image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 4*theme.fontSizeDay) +
 	            '" style="font-size:'+ theme.fontSize +'px"> DRF @ 20°C: '+
