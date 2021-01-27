@@ -202,7 +202,8 @@ function Theme() {
     this.yPositionDayAboveAxis = 20 * this.strokeWidth;
     this.heightPeriod = 2 * this.strokeWidth;
     this.egglayCol = "red";
-    this.colScheme = ["slateBlue", "blue", "pink", "aqua", "darkOrchid"];
+    // https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=8
+    this.colScheme = ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00"];
     this.periodNameSpacing = 0 * this.strokeWidth;
     this.linesEggLayBeginsEnds = 2;
     this.linesSpacingEggLayBeginsEnds = 5 * this.strokeWidth;
@@ -552,11 +553,6 @@ function drawTimeline(){
     ############################################################################## */
 
     var xBeg, xEnd;
-    
-    
-    
-    
-    
 
 
     // draw egg lay period
@@ -570,9 +566,11 @@ function drawTimeline(){
 
         for(yy_row=0; yy_row<starts.length; yy_row++){  //foreach vertical row (1 if bleach, 2 if egg-lay)
             
-            image += drawPeriod(starts[yy_row] + perBeg, starts[yy_row] + perBeg + perDuration,
-                 10 + theme.linesSpacingEggLayBeginsEnds*yy_row,
-                 yy_row==(starts.length -1)? perName: '', theme.colScheme[per-5]);
+            image += drawPeriod(starts[yy_row] + perBeg,   //beginning
+                                starts[yy_row] + perBeg + perDuration,  //end
+                                10 + theme.linesSpacingEggLayBeginsEnds*yy_row, //y coordinates
+                                yy_row==(starts.length -1)? perName: '',  //name (only for last one)
+                                theme.colScheme[per-4]);  //color, skip value 0 that can be used for egg-lay
         }
     }
     
