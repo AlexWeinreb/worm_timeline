@@ -240,15 +240,17 @@ function checkArrest(){
     if(document.getElementById('arrest').checked == true){
         document.getElementById('formEggLay').innerHTML = "";
         document.getElementById('labelBeginning').innerHTML = "On food at:";
-		Periods = new Periods_default_bleach();
-		populatePeriods(Periods);
+    		Periods = new Periods_default_bleach();
+    		populatePeriods(Periods);
+    		console.log("Populated with bleach.")
     }
     else{
         document.getElementById('formEggLay').innerHTML = 'End of egg-lay:<br>\
 <input type="time" id="end">';
         document.getElementById('labelBeginning').innerHTML = "Beginning of egg-lay:";
-		Periods = new Periods_default_egglay();
-		populatePeriods(Periods);
+    		Periods = new Periods_default_egglay();
+    		populatePeriods(Periods);
+    		console.log("Populated with egg-lay.")
     }
 }
 
@@ -359,15 +361,6 @@ function deletePeriod(per){
     }
 }
 
-/*
-// from https://www.javascripttutorial.net/dom/manipulating/remove-all-child-nodes/
-function deleteAllPeriods(){
-	parent = document.getElementById("periods");
-	while (parent.firstChild) {
-        parent.removeChild(parent.firstChild);
-    }
-	nPeriods = 0;
-}*/
 
 function deleteAllPeriods(){
 	while (nPeriods > 0) {
@@ -502,11 +495,16 @@ function drawTimeline(){
     isEggLay = !iForm.arrest.checked;
 	
 	if(isEggLay){
-		eggLayBegins = parseInt(iForm.beginning.value.split(":")[0]) + iForm.beginning.value.split(":")[1] /60;
-		eggLayEnds = parseInt(iForm.end.value.split(":")[0]) + iForm.end.value.split(":")[1] /60;
-		if(eggLayBegins > eggLayEnds) eggLayBegins -= 24; //for the edge case when egg-lay around midnight
+	  // the starts are for the beginning and end of egg-lays
+	  var starts = [parseInt(iForm.beginning.value.split(":")[0]) + iForm.beginning.value.split(":")[1] /60,
+	                parseInt(iForm.end.value.split(":")[0]) + iForm.end.value.split(":")[1] /60];
+
+		if(starts[0] > starts[1]) starts[0] -= 24; //for the edge case when egg-lay around midnight
+	} else{
+	  // for bleach, the only start is the on-food time.
+	  var starts = [parseInt(iForm.beginning.value.split(":")[0]) + iForm.beginning.value.split(":")[1] /60];
 	}
-    temp = iForm.temperature.value;
+  temp = iForm.temperature.value;
   
     // read the period form
 	var perName, perDuration,
@@ -558,26 +556,23 @@ function drawTimeline(){
     
     
     
+    
 
 
     // draw egg lay period
-    if(isEggLay) image += drawPeriod(eggLayBegins, eggLayEnds, 10, "Egg lay", theme.colScheme[0]);
+    if(isEggLay) image += drawPeriod(starts[0], starts[1], 10, "Egg lay", theme.colScheme[0]);
     
     // Draw other periods
-    
+    for(per=5; per<perList.length; per++){ //foreach period
+        perName = perList[per].childNodes[1].value;
+        perBeg = perList[per].childNodes[3].value / DRF;
+        perDuration = perList[per].childNodes[4].value / DRF;
 
-
-    for(i=5; i<perList.length; i++){
-        perName = perList[i].childNodes[1].value;
-        perBeg = perList[i].childNodes[3].value / DRF;
-        perDuration = perList[i].childNodes[4].value / DRF;
-
-        if(theme.linesEggLayBeginsEnds == 2){
-            image += drawPeriod(eggLayBegins + perBeg, eggLayBegins + perBeg + perDuration,
-                 10, '', theme.colScheme[i-5]);
-            image += drawPeriod(eggLayEnds + perBeg, eggLayEnds + perBeg + perDuration,
-                 10 + theme.linesSpacingEggLayBeginsEnds,
-                  perName, theme.colScheme[i-5]);
+        for(yy_row=0; yy_row<starts.length; yy_row++){  //foreach vertical row (1 if bleach, 2 if egg-lay)
+            
+            image += drawPeriod(starts[yy_row] + perBeg, starts[yy_row] + perBeg + perDuration,
+                 10 + theme.linesSpacingEggLayBeginsEnds*yy_row,
+                 yy_row==(starts.length -1)? perName: '', theme.colScheme[per-5]);
         }
     }
     
@@ -593,11 +588,11 @@ function drawTimeline(){
 
     image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
 	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay began: '+
-	             Math.trunc(eggLayBegins) + "h"+ Math.round(60*(eggLayBegins%1)) +'</text>';
+	             Math.trunc(starts[0]) + "h"+ Math.round(60*(starts[0]%1)) +'</text>';
 
 	image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 3*theme.fontSizeDay) +
 	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay ended: '+
-	            Math.trunc(eggLayEnds) + "h"+ Math.round(60*(eggLayEnds %1)) +'</text>';
+	            Math.trunc(starts[1]) + "h"+ Math.round(60*(starts[1] %1)) +'</text>';
 
     image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 4*theme.fontSizeDay) +
 	            '" style="font-size:'+ theme.fontSize +'px"> DRF @ 20°C: '+
