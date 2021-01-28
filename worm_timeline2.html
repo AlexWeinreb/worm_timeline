@@ -473,10 +473,10 @@ var currDt = new Date();
 //use current date as title
 document.getElementById('title').value = currDt.toISOString().slice(0,10);
 //use current time as egg-lay start
-document.getElementById('beginning').value = currDt.toLocaleTimeString().slice(0,5);
+document.getElementById('beginning').value = currDt.toTimeString().slice(0,5);
 //set egg-lay end 2h later
 currDt.setHours(currDt.getHours() +2);
-document.getElementById('end').value = currDt.toLocaleTimeString().slice(0,5);
+document.getElementById('end').value = currDt.toTimeString().slice(0,5);
 
 populatePeriods(Periods);
 
