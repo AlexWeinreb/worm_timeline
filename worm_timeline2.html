@@ -398,9 +398,8 @@ function updatePeriodDuration(per){
     // Update previous period duration upon input of beginning
     var i = parseInt(per.id.substring(9));
     if(i < 2 ){
-        console.log("can't compute");
+        console.log("Can't update duration, too few periods.");
     } else{
-        console.log("updating duration "+i);
         document.getElementById("durPeriod"+(i-1)).value =
             Number(document.getElementById("begPeriod"+i).value) - Number(document.getElementById("begPeriod"+(i-1)).value);
     }
@@ -410,10 +409,9 @@ function updatePeriodBeginning(per){
     // Update next period begin time upon input of duration
     var i = parseInt(per.id.substring(9));
     if(i > nPeriods - 1){
-        console.log("can't compute");
+        console.log("Can't update beginning, it's the last period.");
         console.log("i="+i+" ; nPeriods = "+nPeriods);
     } else{
-        console.log("updating begin "+i);
         document.getElementById("begPeriod"+ (i+1)).value =
             Number(document.getElementById("begPeriod"+i).value) + Number(document.getElementById("durPeriod"+i).value);
     }
@@ -535,7 +533,6 @@ function drawPeriod(tBeg, tEnd, yPos, periodName, color){
 			'" y="'+ (yy + theme.heightPeriod + theme.periodNameSpacing + theme.fontSizeDay) +
 			'" style="font-size:'+ theme.fontSizeDay +'px">'+ periodName +'</text>';
 	}
-	console.log("periodName "+periodName+" tBeg "+tBeg+ " tEnd "+tEnd+"; color: "+color);
 	return im;
 }
 
