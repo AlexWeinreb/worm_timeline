@@ -708,7 +708,7 @@ function drawTimeline(){
         // Generate download of hello.txt file with some content
         var text = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">'+image;
-        var filename = "tl.svg";
+        var filename = title.replace(/[^a-z0-9\\-_]/gi, '_') + ".svg";
         download(filename, text);
     },
     false);
