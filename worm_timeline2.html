@@ -177,8 +177,12 @@ function displayHelp(){
     <br>
     
     <div class="miniBox">
-    <label for="arrest">L1 arrest?<br></label>
-     <input type="checkbox" id="arrest" value="eggLay" onchange="checkArrest()"><br>
+    <label for="synchType">Type of synchronization:<br></label>
+     <select id="synchType" onchange="checkSynchType()">
+	   <option value="eggLay">Egg-lay</option>
+	   <option value="bleach">L1 arrested</option>
+	   <option value="mesh">Mesh synchronization</option>
+	 </select><br>
     </div>
     <br>
 
@@ -282,7 +286,7 @@ function Theme() {
 function Periods_default_egglay() {
 	this.stageName = ["L1", "L2", "L3", "L4"];
 	this.stageDuration = [15, 7, 8, 12];
-	this.stageBeginning = [0, 15, 7, 8];
+	this.stageBeginning = [11, 15, 7, 8];
 	this.totalDuration = getTotalDuration(this.stageDuration); //in hours
 }
 
@@ -292,6 +296,30 @@ function Periods_default_bleach() {
 	this.stageBeginning = [0, 15, 9, 10];
 	this.totalDuration = getTotalDuration(this.stageDuration); //in hours
 }
+
+function Periods_default_mesh() {
+	this.stageName = ["L1", "L2", "L3", "L4"];
+	this.stageDuration = [15, 7, 8, 12];
+	this.stageBeginning = [0, 15, 9, 10];
+	this.totalDuration = getTotalDuration(this.stageDuration); //in hours
+}
+
+
+
+
+
+
+function updateInputEnd(){
+	startTime = document.getElementById('beginning').value;
+	console.log(startTime);
+	//set egg-lay end 2h later
+	let hours = parseInt(startTime.split(":")[0]) + 2;
+	if(hours > 23) hours = hours - 24 ;
+	if(hours < 10) hours = "0" + hours ;
+	console.log(hours);
+	document.getElementById('end').value = hours + ":" + startTime.split(":")[1]
+}
+
 
 // Use defaults
 var Periods = new Periods_default_egglay();
@@ -305,24 +333,38 @@ var totalDuration;
 ############################################################################## */
 
 
-function checkArrest(){
+function checkSynchType(){
     // Actions to perform upon choosing between egg-lay or arrested
     //document.getElementById('drawHere').innerHTML = document.getElementById('arrest').checked;
-    if(document.getElementById('arrest').checked == true){
+    if(document.getElementById('synchType').value == "bleach"){
         document.getElementById('formEggLay').innerHTML = "";
         document.getElementById('labelBeginning').innerHTML = "On food at:";
-    		Periods = new Periods_default_bleach();
-    		populatePeriods(Periods);
-    		console.log("Populated with bleach.")
-    }
-    else{
+		Periods = new Periods_default_bleach();
+		populatePeriods(Periods);
+		console.log("Populated with bleach.");
+		
+    } else if(document.getElementById('synchType').value == "eggLay"){
         document.getElementById('formEggLay').innerHTML = 'End of egg-lay:<br>\
 <input type="time" id="end">';
         document.getElementById('labelBeginning').innerHTML = "Beginning of egg-lay:";
-    		Periods = new Periods_default_egglay();
-    		populatePeriods(Periods);
-    		console.log("Populated with egg-lay.")
-    }
+		Periods = new Periods_default_egglay();
+		populatePeriods(Periods);
+		updateInputEnd();
+		console.log("Populated with egg-lay.");
+		
+    } else if(document.getElementById('synchType').value == "mesh"){
+	    document.getElementById('formEggLay').innerHTML = 'End of hatching:<br>\
+<input type="time" id="end">';
+        document.getElementById('labelBeginning').innerHTML = "Beginning of hatching:";
+		Periods = new Periods_default_mesh();
+		populatePeriods(Periods);
+		updateInputEnd();
+		console.log("Populated with hatching.");
+		
+	} else{
+	    console.log("Synchronization method unknown: " + document.getElementById('synchType').value);
+	    throw "Unknown synchronization method";
+	}
 }
 
 var DRF; //keep it as global variable, so no need to retrieve toFixed value later
@@ -467,15 +509,13 @@ function getTotalDuration(perList){
 ############################################################################## */
 
 // Populate main input form
-var currDt = new Date();
+let currDt = new Date();
 //use current date as title
 document.getElementById('title').value = currDt.toISOString().slice(0,10);
 //use current time as egg-lay start
 document.getElementById('beginning').value = currDt.toTimeString().slice(0,5);
-//set egg-lay end 2h later
-currDt.setHours(currDt.getHours() +2);
-document.getElementById('end').value = currDt.toTimeString().slice(0,5);
 
+updateInputEnd()
 populatePeriods(Periods);
 
 
@@ -550,6 +590,9 @@ function download(filename, text) {
 	document.body.removeChild(element);
 }
 
+function time_in_hours(time){
+    return parseInt(time.split(":")[0]) + time.split(":")[1] /60;
+}
 
 // main drawing
 function drawTimeline(){
@@ -560,17 +603,21 @@ function drawTimeline(){
     //Reading the input form
     iForm = document.getElementById("inputForm");
     title = iForm.title.value;
-    isEggLay = !iForm.arrest.checked;
-	
+    isEggLay = !(iForm.synchType.value == "bleach");
+	console.log("isEgglay: "+ isEggLay);
+
 	if(isEggLay){
 	  // the starts are for the beginning and end of egg-lays
-	  var starts = [parseInt(iForm.beginning.value.split(":")[0]) + iForm.beginning.value.split(":")[1] /60,
-	                parseInt(iForm.end.value.split(":")[0]) + iForm.end.value.split(":")[1] /60];
+	  var starts = [time_in_hours(iForm.beginning.value),
+	                time_in_hours(iForm.end.value)];
 
 		if(starts[0] > starts[1]) starts[0] -= 24; //for the edge case when egg-lay around midnight
+		
+		console.log("starts: "+ starts[0] + ", " + starts[1]);
+	
 	} else{
 	  // for bleach, the only start is the on-food time.
-	  var starts = [parseInt(iForm.beginning.value.split(":")[0]) + iForm.beginning.value.split(":")[1] /60];
+	  var starts = [time_in_hours(iForm.beginning.value)];
 	}
   temp = iForm.temperature.value;
   
@@ -623,8 +670,11 @@ function drawTimeline(){
 
 
     // draw egg lay period
-    if(isEggLay) image += drawPeriod(starts[0], starts[1], 10, "Egg lay", theme.colScheme[0]);
-    
+    if(iForm.synchType.value == "eggLay") image += drawPeriod(starts[0], starts[1], 10, "Egg lay", theme.colScheme[0]);
+    // case mesh
+	if(iForm.synchType.value == "mesh") image += drawPeriod(starts[0], starts[1], 40, "Hatch", theme.colScheme[0]);
+	
+	
     // Draw other periods
     for(per=5; per<perList.length; per++){ //foreach period
         perName = perList[per].childNodes[1].value;
@@ -652,12 +702,13 @@ function drawTimeline(){
 	            '" style="font-size:'+ theme.fontSize +'px">'+ title +'</text>';
 
     if(isEggLay){
+	  legnd = (iForm.synchType.value == "eggLay")? "Egg-lay": "Hatch";
       image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
-	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay began: '+
+	            '" style="font-size:'+ theme.fontSize +'px"> '+legnd+' began: '+
 	             Math.trunc(starts[0]) + "h"+ Math.round(60*(starts[0]%1)) +'</text>';
 
       image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 3*theme.fontSizeDay) +
-  	            '" style="font-size:'+ theme.fontSize +'px"> Egg-lay ended: '+
+  	            '" style="font-size:'+ theme.fontSize +'px"> '+legnd+' ended: '+
   	            Math.trunc(starts[1]) + "h"+ Math.round(60*(starts[1] %1)) +'</text>';
     } else{
       image += '<text x="' + 2 * theme.strokeWidth + '" y="'+ (2*theme.strokeWidth + 2*theme.fontSizeDay) +
